@@ -6,7 +6,6 @@
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>Golf Tracker</title>
   <link rel="stylesheet" href="./styles.css" />
-  <!-- Chart.js (CDN) -->
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
 </head>
 <body>
@@ -16,7 +15,7 @@
       <div class="gate-top">
         <div class="pill">UI lock</div>
         <h1>Golf Tracker</h1>
-        <p class="muted">Enter password to unlock. (This is a deterrent, not real security.)</p>
+        <p class="muted">Enter password to unlock. (Deterrent, not real security.)</p>
       </div>
 
       <form id="gateForm" class="gate-form">
@@ -32,7 +31,7 @@
         <summary>How to set your password</summary>
         <p class="muted">
           In <code>main.js</code>, replace <code>PASSWORD_SHA256_HEX</code> with the SHA-256 hex of your password.
-          A helper is included in the file comments.
+          A helper snippet is included in the file.
         </p>
       </details>
     </div>
@@ -49,7 +48,8 @@
     </div>
 
     <div class="topbar-actions">
-      <button id="btnExport" class="btn">Export</button>
+      <button id="btnExport" class="btn">Export JSON</button>
+      <button id="btnExportCSV" class="btn">Export CSV</button>
       <button id="btnImport" class="btn">Import</button>
       <button id="btnLock" class="btn danger">Lock</button>
     </div>
@@ -59,10 +59,15 @@
     <button class="tab active" data-view="portal">Portal</button>
     <button class="tab" data-view="addRound">Add round</button>
     <button class="tab" data-view="courses">Courses</button>
+    <button class="tab" data-view="putting">Putting</button>
+    <button class="tab" data-view="mistakes">Mistakes</button>
+    <button class="tab" data-view="courseView">Course view</button>
+    <button class="tab" data-view="archetypes">Archetypes</button>
     <button class="tab" data-view="raw">Raw data</button>
   </nav>
 
   <main class="container">
+
     <!-- PORTAL -->
     <section id="view-portal" class="view active">
       <div class="grid">
@@ -73,12 +78,13 @@
               <span id="chipRounds" class="chip">0 rounds</span>
               <span id="chipBest" class="chip">Best: —</span>
               <span id="chipAvg" class="chip">Avg to par: —</span>
+              <span id="chipHcp" class="chip">Handicap: —</span>
             </div>
           </div>
           <div class="chart-wrap">
             <canvas id="chartTrend" height="140"></canvas>
           </div>
-          <p class="muted tiny">Trend shows <strong>to-par per round</strong>. 9-hole rounds are normalized to 18 (clearly labelled in tooltip).</p>
+          <p class="muted tiny">Trend shows <strong>to-par per round</strong>. 9-hole rounds are normalized to 18 (shown in tooltip).</p>
         </div>
 
         <div class="card span-3">
@@ -101,9 +107,27 @@
 
         <div class="card span-3">
           <div class="card-header">
+            <h2>Goal</h2>
+          </div>
+          <div class="goal-wrap">
+            <div class="goal-ring">
+              <div id="goalPct" class="goal-pct">—</div>
+              <div class="muted tiny">progress</div>
+            </div>
+            <div>
+              <div id="goalTitle" class="goal-title">—</div>
+              <div id="goalSub" class="muted tiny">—</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="card span-6">
+          <div class="card-header">
             <h2>Next round targets</h2>
           </div>
           <ul id="targets" class="targets"></ul>
+          <div class="divider"></div>
+          <div class="muted tiny" id="insights"></div>
         </div>
 
         <div class="card span-6">
@@ -128,13 +152,56 @@
       </div>
     </section>
 
+    <!-- FILTER BAR (shared across analysis pages) -->
+    <section class="filterbar" id="filterbar">
+      <div class="filter-row">
+        <label class="field">
+          <span>From</span>
+          <input id="fFrom" type="date" />
+        </label>
+        <label class="field">
+          <span>To</span>
+          <input id="fTo" type="date" />
+        </label>
+        <label class="field">
+          <span>Course</span>
+          <select id="fCourse"></select>
+        </label>
+        <label class="field">
+          <span>Tee</span>
+          <select id="fTee"></select>
+        </label>
+      </div>
+
+      <div class="filter-row">
+        <label class="field">
+          <span>Type</span>
+          <select id="fType">
+            <option value="all">All</option>
+            <option value="course">On-course</option>
+            <option value="sim">Sim</option>
+          </select>
+        </label>
+        <label class="field">
+          <span>Holes</span>
+          <select id="fFormat">
+            <option value="all">All</option>
+            <option value="18">18</option>
+            <option value="9">9</option>
+          </select>
+        </label>
+        <button id="btnClearFilters" class="btn">Clear</button>
+        <div class="muted tiny" id="filterHint">Filters apply to analysis pages.</div>
+      </div>
+    </section>
+
     <!-- ADD ROUND -->
     <section id="view-addRound" class="view">
       <div class="grid">
         <div class="card span-5">
           <div class="card-header">
             <h2>Add round</h2>
-            <p class="muted tiny">Fast logging: hole-by-hole scores only.</p>
+            <p class="muted tiny">Quick logging is still score-first. Detail mode is optional.</p>
           </div>
 
           <form id="roundForm" class="form">
@@ -185,6 +252,23 @@
             </label>
 
             <label class="field">
+              <span>Detail mode</span>
+              <div class="toggle-row">
+                <label class="toggle">
+                  <input id="detailMode" type="checkbox" />
+                  <span class="toggle-ui"></span>
+                </label>
+                <span class="muted tiny">Adds putts, penalties, FIR/GIR, first putt bucket, notes.</span>
+              </div>
+            </label>
+
+            <label class="field">
+              <span>Adjusted gross (optional)</span>
+              <input id="adjustedGross" type="number" min="1" step="1" placeholder="Leave blank to use Gross score" />
+              <span class="muted tiny">Used for score differential calculations later. You can ignore this for now.</span>
+            </label>
+
+            <label class="field">
               <span>Notes (optional)</span>
               <textarea id="roundNotes" rows="3" placeholder="Anything worth remembering?"></textarea>
             </label>
@@ -202,15 +286,7 @@
 
           <div class="table-wrap">
             <table class="table" id="scoreTable">
-              <thead>
-                <tr>
-                  <th>Hole</th>
-                  <th>Par</th>
-                  <th>SI</th>
-                  <th>Yds</th>
-                  <th>Your score</th>
-                </tr>
-              </thead>
+              <thead id="scoreHead"></thead>
               <tbody></tbody>
             </table>
           </div>
@@ -218,6 +294,8 @@
           <div class="summary-row">
             <div class="summary-pill">Gross: <strong id="sumGross">—</strong></div>
             <div class="summary-pill">To par: <strong id="sumToPar">—</strong></div>
+            <div class="summary-pill">Putts: <strong id="sumPutts">—</strong></div>
+            <div class="summary-pill">Penalties: <strong id="sumPens">—</strong></div>
           </div>
         </div>
       </div>
@@ -245,7 +323,22 @@
               <button id="btnDeleteCourse" class="btn danger" type="button">Delete</button>
             </div>
 
-            <p class="muted tiny">Tip: You can paste pars/yardages from a scorecard photo manually.</p>
+            <div class="divider"></div>
+
+            <h3 class="h3">Player profile</h3>
+            <label class="field">
+              <span>Ruleset</span>
+              <select id="ruleset">
+                <option value="WHS_UK">WHS (UK)</option>
+                <option value="WHS">WHS</option>
+              </select>
+            </label>
+            <label class="field">
+              <span>Handicap index (optional)</span>
+              <input id="hcpIndex" type="number" step="0.1" placeholder="Leave blank if unknown" />
+            </label>
+            <button id="btnSaveProfile" class="btn">Save profile</button>
+            <p id="profileMsg" class="muted tiny"></p>
           </div>
         </div>
 
@@ -308,6 +401,110 @@
       </div>
     </section>
 
+    <!-- PUTTING -->
+    <section id="view-putting" class="view">
+      <div class="grid">
+        <div class="card span-6">
+          <div class="card-header">
+            <h2>Putting</h2>
+            <p class="muted tiny">Requires detail mode entries for putts. No data = no judgement 😇</p>
+          </div>
+          <div class="chart-wrap">
+            <canvas id="chartPuttsTrend" height="160"></canvas>
+          </div>
+        </div>
+        <div class="card span-6">
+          <div class="card-header">
+            <h2>3-putt rate</h2>
+          </div>
+          <div class="kpi">
+            <div class="kpi-item">
+              <div class="kpi-label">3-putts per round</div>
+              <div id="kpi3Putts" class="kpi-value">—</div>
+              <div class="kpi-sub">Filtered selection</div>
+            </div>
+            <div class="kpi-item">
+              <div class="kpi-label">Avg putts/hole</div>
+              <div id="kpiPuttsHole" class="kpi-value">—</div>
+              <div class="kpi-sub">Filtered selection</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- MISTAKES -->
+    <section id="view-mistakes" class="view">
+      <div class="grid">
+        <div class="card span-6">
+          <div class="card-header">
+            <h2>Penalties trend</h2>
+            <p class="muted tiny">Requires detail mode entries for penalties.</p>
+          </div>
+          <div class="chart-wrap">
+            <canvas id="chartPensTrend" height="160"></canvas>
+          </div>
+        </div>
+        <div class="card span-6">
+          <div class="card-header">
+            <h2>Penalties vs blow-ups</h2>
+            <p class="muted tiny">Correlation (rough): do penalty holes cluster with doubles+?</p>
+          </div>
+          <div class="chart-wrap">
+            <canvas id="chartPensVsBlowups" height="160"></canvas>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- COURSE VIEW -->
+    <section id="view-courseView" class="view">
+      <div class="card">
+        <div class="card-header">
+          <h2>Course view</h2>
+          <p class="muted tiny">Performance by course + tee (uses filters above).</p>
+        </div>
+        <div class="table-wrap">
+          <table class="table" id="courseTable">
+            <thead>
+              <tr>
+                <th>Course</th>
+                <th>Tee</th>
+                <th>Rounds</th>
+                <th>Avg to par (18-norm)</th>
+                <th>Best to par (18-norm)</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- ARCHETYPES -->
+    <section id="view-archetypes" class="view">
+      <div class="grid">
+        <div class="card span-6">
+          <div class="card-header">
+            <h2>SI buckets</h2>
+            <p class="muted tiny">Avg vs par by SI bucket (filtered).</p>
+          </div>
+          <div class="chart-wrap">
+            <canvas id="chartArcheSI" height="160"></canvas>
+          </div>
+        </div>
+        <div class="card span-6">
+          <div class="card-header">
+            <h2>Par-4 yardage buckets</h2>
+            <p class="muted tiny">Avg vs par (Par 4 only; needs yardages in course cache).</p>
+          </div>
+          <div class="chart-wrap">
+            <canvas id="chartArcheYds" height="160"></canvas>
+          </div>
+        </div>
+      </div>
+    </section>
+
     <!-- RAW DATA -->
     <section id="view-raw" class="view">
       <div class="card">
@@ -326,6 +523,7 @@
                 <th>Format</th>
                 <th>Gross</th>
                 <th>To par</th>
+                <th>Differential</th>
               </tr>
             </thead>
             <tbody></tbody>
@@ -342,8 +540,30 @@
         <h3>Import</h3>
         <button class="btn" value="cancel">Close</button>
       </div>
-      <p class="muted tiny">Paste exported JSON here. This will overwrite your current data.</p>
-      <textarea id="importText" rows="10" class="mono" placeholder='{"courses":[], "rounds":[]}'></textarea>
+
+      <div class="row">
+        <label class="field">
+          <span>Import type</span>
+          <select id="importType">
+            <option value="json">JSON (full backup)</option>
+            <option value="csv">CSV (long format)</option>
+          </select>
+        </label>
+        <div class="muted tiny" style="align-self:end">
+          CSV long = one row per hole. Easiest to paste from anywhere.
+        </div>
+      </div>
+
+      <div class="divider"></div>
+
+      <div id="csvHelp" class="muted tiny">
+        <strong>CSV Long headers (exact):</strong><br/>
+        <code>date,roundType,courseName,teeName,format,startHole,courseRating,slopeRating,holeNumber,score,putts,penalties,fairwayHit,gir,firstPuttBucket,holeNotes,roundNotes</code><br/>
+        Use <code>true/false</code> for fairwayHit/gir, or leave blank.
+      </div>
+
+      <textarea id="importText" rows="12" class="mono" placeholder='{"version":2,"playerProfile":{...},"courses":[],"rounds":[]}  OR  CSV rows...'></textarea>
+
       <div class="row">
         <button id="btnDoImport" class="btn primary" value="ok">Import</button>
         <span id="importMsg" class="muted tiny"></span>
