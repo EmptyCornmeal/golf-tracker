@@ -18,7 +18,7 @@
  * 3) Replace PASSWORD_SHA256_HEX below with the printed hex.
  */
 
-const PASSWORD_SHA256_HEX = "REPLACE_ME_WITH_YOUR_SHA256_HEX";
+const PASSWORD_SHA256_HEX = "golftracker2026";
 const STORAGE_KEY = "golfTracker.v1";
 const UNLOCK_KEY = "golfTracker.unlocked.v1";
 
