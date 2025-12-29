@@ -2,7 +2,6 @@
 :root{
   --bg:#0b0f14;
   --panel:#0f1620;
-  --panel2:#101b28;
   --text:#e8eef7;
   --muted:#9fb0c6;
   --border:rgba(255,255,255,.08);
@@ -60,6 +59,7 @@ code{background:rgba(255,255,255,.06); padding:.15rem .35rem; border-radius:10px
   padding: 12px 14px;
   max-width:var(--max);
   margin:0 auto;
+  overflow:auto;
 }
 
 .tab{
@@ -70,6 +70,7 @@ code{background:rgba(255,255,255,.06); padding:.15rem .35rem; border-radius:10px
   border-radius: 999px;
   cursor:pointer;
   transition: transform .08s ease, background .2s ease;
+  white-space:nowrap;
 }
 .tab:hover{background:rgba(255,255,255,.06)}
 .tab:active{transform: scale(.98)}
@@ -97,19 +98,19 @@ code{background:rgba(255,255,255,.06); padding:.15rem .35rem; border-radius:10px
 .muted{color:var(--muted)}
 .tiny{font-size:.85rem; line-height:1.35}
 
+.h3{margin: 6px 0 0; font-size:1rem}
+
 .span-3{grid-column: span 3}
 .span-4{grid-column: span 4}
 .span-5{grid-column: span 5}
 .span-6{grid-column: span 6}
 .span-7{grid-column: span 7}
 .span-8{grid-column: span 8}
-.span-12{grid-column: span 12}
 
 @media (max-width: 980px){
   .span-3,.span-4,.span-5,.span-6,.span-7,.span-8{grid-column: span 12}
   .topbar{flex-direction:column; align-items:stretch}
   .topbar-actions{justify-content:stretch}
-  .tabs{overflow:auto}
 }
 
 .btn{
@@ -146,13 +147,13 @@ textarea{resize:vertical}
 .inline{display:flex; gap:10px; align-items:stretch}
 .inline select{flex:1}
 
-.divider{height:1px; background: var(--border); margin: 6px 0}
+.divider{height:1px; background: var(--border); margin: 10px 0}
 
 .table-wrap{overflow:auto; border-radius: 16px; border:1px solid var(--border)}
 .table{
   width:100%;
   border-collapse: collapse;
-  min-width: 640px;
+  min-width: 820px;
   background: rgba(0,0,0,.10);
 }
 .table th, .table td{
@@ -162,7 +163,7 @@ textarea{resize:vertical}
   font-size:.92rem;
 }
 .table th{color:var(--muted); font-weight:700}
-.table td input{
+.table td input, .table td select{
   width:100%;
   min-width: 90px;
 }
@@ -216,6 +217,60 @@ textarea{resize:vertical}
 
 .stack{display:flex; flex-direction:column; gap:12px}
 
+.toggle-row{display:flex; gap:12px; align-items:center}
+.toggle{position:relative; width:52px; height:30px}
+.toggle input{display:none}
+.toggle-ui{
+  position:absolute; inset:0;
+  background: rgba(255,255,255,.10);
+  border:1px solid var(--border);
+  border-radius:999px;
+  cursor:pointer;
+}
+.toggle-ui::after{
+  content:"";
+  position:absolute; top:4px; left:4px;
+  width:22px; height:22px;
+  border-radius:999px;
+  background: rgba(255,255,255,.35);
+  transition: transform .2s ease;
+}
+.toggle input:checked + .toggle-ui{
+  background: rgba(86,180,255,.20);
+  border-color: rgba(86,180,255,.35);
+}
+.toggle input:checked + .toggle-ui::after{ transform: translateX(22px) }
+
+.goal-wrap{display:flex; gap:14px; align-items:center}
+.goal-ring{
+  width:92px; height:92px; border-radius:999px;
+  border:1px solid var(--border);
+  background: conic-gradient(rgba(86,180,255,.50) var(--pct, 0%), rgba(255,255,255,.07) 0);
+  display:grid; place-items:center;
+}
+.goal-pct{font-weight:900; font-size:1.2rem}
+.goal-title{font-weight:800}
+
+/* Filter bar */
+.filterbar{
+  max-width:var(--max);
+  margin: 0 auto 14px;
+  padding: 0 14px;
+}
+.filter-row{
+  display:grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap:12px;
+  margin-bottom:10px;
+}
+.filter-row:nth-child(2){
+  grid-template-columns: repeat(4, 1fr);
+}
+@media (max-width: 980px){
+  .filter-row{grid-template-columns:1fr 1fr}
+  .filter-row:nth-child(2){grid-template-columns:1fr 1fr}
+}
+
 /* Gate */
 .gate{
   position:fixed; inset:0; z-index:9999;
@@ -242,7 +297,7 @@ textarea{resize:vertical}
 .dialog::backdrop{background: rgba(0,0,0,.55)}
 .dialog{border:none; padding:0; background: transparent}
 .dialog-card{
-  width:min(720px, 96vw);
+  width:min(920px, 96vw);
   background: linear-gradient(180deg, rgba(255,255,255,.06), rgba(255,255,255,.02));
   border:1px solid var(--border);
   border-radius: 22px;
