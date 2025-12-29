@@ -1,0 +1,356 @@
+<!-- index.html -->
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Golf Tracker</title>
+  <link rel="stylesheet" href="./styles.css" />
+  <!-- Chart.js (CDN) -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+</head>
+<body>
+  <!-- Access Gate (UI-only) -->
+  <div id="gate" class="gate">
+    <div class="gate-card">
+      <div class="gate-top">
+        <div class="pill">UI lock</div>
+        <h1>Golf Tracker</h1>
+        <p class="muted">Enter password to unlock. (This is a deterrent, not real security.)</p>
+      </div>
+
+      <form id="gateForm" class="gate-form">
+        <label class="field">
+          <span>Password</span>
+          <input id="gatePassword" type="password" autocomplete="current-password" placeholder="••••••••" required />
+        </label>
+        <button class="btn primary" type="submit">Unlock</button>
+        <p id="gateMsg" class="gate-msg" aria-live="polite"></p>
+      </form>
+
+      <details class="gate-details">
+        <summary>How to set your password</summary>
+        <p class="muted">
+          In <code>main.js</code>, replace <code>PASSWORD_SHA256_HEX</code> with the SHA-256 hex of your password.
+          A helper is included in the file comments.
+        </p>
+      </details>
+    </div>
+  </div>
+
+  <!-- App Shell -->
+  <header class="topbar">
+    <div class="brand">
+      <div class="logo">⛳</div>
+      <div>
+        <div class="title">Golf Tracker</div>
+        <div id="subtitle" class="subtitle">Portal</div>
+      </div>
+    </div>
+
+    <div class="topbar-actions">
+      <button id="btnExport" class="btn">Export</button>
+      <button id="btnImport" class="btn">Import</button>
+      <button id="btnLock" class="btn danger">Lock</button>
+    </div>
+  </header>
+
+  <nav class="tabs" role="navigation" aria-label="Primary">
+    <button class="tab active" data-view="portal">Portal</button>
+    <button class="tab" data-view="addRound">Add round</button>
+    <button class="tab" data-view="courses">Courses</button>
+    <button class="tab" data-view="raw">Raw data</button>
+  </nav>
+
+  <main class="container">
+    <!-- PORTAL -->
+    <section id="view-portal" class="view active">
+      <div class="grid">
+        <div class="card span-6">
+          <div class="card-header">
+            <h2>Progress</h2>
+            <div class="chip-row">
+              <span id="chipRounds" class="chip">0 rounds</span>
+              <span id="chipBest" class="chip">Best: —</span>
+              <span id="chipAvg" class="chip">Avg to par: —</span>
+            </div>
+          </div>
+          <div class="chart-wrap">
+            <canvas id="chartTrend" height="140"></canvas>
+          </div>
+          <p class="muted tiny">Trend shows <strong>to-par per round</strong>. 9-hole rounds are normalized to 18 (clearly labelled in tooltip).</p>
+        </div>
+
+        <div class="card span-3">
+          <div class="card-header">
+            <h2>Consistency</h2>
+          </div>
+          <div class="kpi">
+            <div class="kpi-item">
+              <div class="kpi-label">Avg blow-up holes</div>
+              <div id="kpiBlowups" class="kpi-value">—</div>
+              <div class="kpi-sub">Double bogey+ per round</div>
+            </div>
+            <div class="kpi-item">
+              <div class="kpi-label">Volatility</div>
+              <div id="kpiVolatility" class="kpi-value">—</div>
+              <div class="kpi-sub">Std dev (hole score vs par)</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="card span-3">
+          <div class="card-header">
+            <h2>Next round targets</h2>
+          </div>
+          <ul id="targets" class="targets"></ul>
+        </div>
+
+        <div class="card span-6">
+          <div class="card-header">
+            <h2>Scoring by par</h2>
+            <p class="muted tiny">Average relative to par on Par 3 / 4 / 5.</p>
+          </div>
+          <div class="chart-wrap">
+            <canvas id="chartByPar" height="160"></canvas>
+          </div>
+        </div>
+
+        <div class="card span-6">
+          <div class="card-header">
+            <h2>Hard vs easy holes</h2>
+            <p class="muted tiny">Stroke index buckets: 1–6 (hard), 7–12 (mid), 13–18 (easy).</p>
+          </div>
+          <div class="chart-wrap">
+            <canvas id="chartBySI" height="160"></canvas>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ADD ROUND -->
+    <section id="view-addRound" class="view">
+      <div class="grid">
+        <div class="card span-5">
+          <div class="card-header">
+            <h2>Add round</h2>
+            <p class="muted tiny">Fast logging: hole-by-hole scores only.</p>
+          </div>
+
+          <form id="roundForm" class="form">
+            <div class="row">
+              <label class="field">
+                <span>Round type</span>
+                <select id="roundType">
+                  <option value="course">On-course</option>
+                  <option value="sim">Sim</option>
+                </select>
+              </label>
+
+              <label class="field">
+                <span>Format</span>
+                <select id="roundFormat">
+                  <option value="18">18 holes</option>
+                  <option value="9">9 holes</option>
+                </select>
+              </label>
+            </div>
+
+            <label class="field">
+              <span>Course</span>
+              <div class="inline">
+                <select id="courseSelect"></select>
+                <button id="btnNewCourseQuick" class="btn" type="button">+ New</button>
+              </div>
+            </label>
+
+            <div class="row">
+              <label class="field">
+                <span>Tee</span>
+                <select id="teeSelect"></select>
+              </label>
+
+              <label class="field">
+                <span>Start hole</span>
+                <select id="startHole">
+                  <option value="1">1</option>
+                  <option value="10">10</option>
+                </select>
+              </label>
+            </div>
+
+            <label class="field">
+              <span>Date</span>
+              <input id="roundDate" type="date" required />
+            </label>
+
+            <label class="field">
+              <span>Notes (optional)</span>
+              <textarea id="roundNotes" rows="3" placeholder="Anything worth remembering?"></textarea>
+            </label>
+
+            <button class="btn primary" type="submit">Save round</button>
+            <p id="roundMsg" class="muted tiny"></p>
+          </form>
+        </div>
+
+        <div class="card span-7">
+          <div class="card-header">
+            <h2>Score entry</h2>
+            <p class="muted tiny">Scores auto-generate once you pick a course/tee.</p>
+          </div>
+
+          <div class="table-wrap">
+            <table class="table" id="scoreTable">
+              <thead>
+                <tr>
+                  <th>Hole</th>
+                  <th>Par</th>
+                  <th>SI</th>
+                  <th>Yds</th>
+                  <th>Your score</th>
+                </tr>
+              </thead>
+              <tbody></tbody>
+            </table>
+          </div>
+
+          <div class="summary-row">
+            <div class="summary-pill">Gross: <strong id="sumGross">—</strong></div>
+            <div class="summary-pill">To par: <strong id="sumToPar">—</strong></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- COURSES -->
+    <section id="view-courses" class="view">
+      <div class="grid">
+        <div class="card span-4">
+          <div class="card-header">
+            <h2>Courses</h2>
+            <p class="muted tiny">Cache course + tee + 18 holes once, reuse forever.</p>
+          </div>
+
+          <div class="stack">
+            <button id="btnNewCourse" class="btn primary">+ Create course</button>
+
+            <label class="field">
+              <span>Existing courses</span>
+              <select id="courseList"></select>
+            </label>
+
+            <div class="row">
+              <button id="btnEditCourse" class="btn" type="button">Edit</button>
+              <button id="btnDeleteCourse" class="btn danger" type="button">Delete</button>
+            </div>
+
+            <p class="muted tiny">Tip: You can paste pars/yardages from a scorecard photo manually.</p>
+          </div>
+        </div>
+
+        <div class="card span-8">
+          <div class="card-header">
+            <h2 id="courseEditorTitle">Course editor</h2>
+            <p class="muted tiny">Create or update a course and one tee set (you can add more tees later).</p>
+          </div>
+
+          <form id="courseForm" class="form">
+            <div class="row">
+              <label class="field">
+                <span>Course name</span>
+                <input id="courseName" required placeholder="e.g., Richmond Park GC" />
+              </label>
+              <label class="field">
+                <span>Location (optional)</span>
+                <input id="courseLocation" placeholder="e.g., London" />
+              </label>
+            </div>
+
+            <div class="divider"></div>
+
+            <div class="row">
+              <label class="field">
+                <span>Tee name</span>
+                <input id="teeName" required placeholder="e.g., White" />
+              </label>
+              <label class="field">
+                <span>Course rating</span>
+                <input id="courseRating" type="number" step="0.1" placeholder="e.g., 71.2" />
+              </label>
+              <label class="field">
+                <span>Slope</span>
+                <input id="slopeRating" type="number" step="1" placeholder="e.g., 128" />
+              </label>
+            </div>
+
+            <div class="row">
+              <button id="btnAutofill" class="btn" type="button">Autofill defaults</button>
+              <button class="btn primary" type="submit">Save course</button>
+              <p id="courseMsg" class="muted tiny"></p>
+            </div>
+
+            <div class="table-wrap">
+              <table class="table" id="holesTable">
+                <thead>
+                  <tr>
+                    <th>Hole</th>
+                    <th>Par</th>
+                    <th>Yds</th>
+                    <th>SI</th>
+                  </tr>
+                </thead>
+                <tbody></tbody>
+              </table>
+            </div>
+          </form>
+        </div>
+      </div>
+    </section>
+
+    <!-- RAW DATA -->
+    <section id="view-raw" class="view">
+      <div class="card">
+        <div class="card-header">
+          <h2>Raw data</h2>
+          <p class="muted tiny">Your rounds in a simple table.</p>
+        </div>
+        <div class="table-wrap">
+          <table class="table" id="roundsTable">
+            <thead>
+              <tr>
+                <th>Date</th>
+                <th>Type</th>
+                <th>Course</th>
+                <th>Tee</th>
+                <th>Format</th>
+                <th>Gross</th>
+                <th>To par</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <!-- Import modal -->
+  <dialog id="importDialog" class="dialog">
+    <form method="dialog" class="dialog-card">
+      <div class="dialog-header">
+        <h3>Import</h3>
+        <button class="btn" value="cancel">Close</button>
+      </div>
+      <p class="muted tiny">Paste exported JSON here. This will overwrite your current data.</p>
+      <textarea id="importText" rows="10" class="mono" placeholder='{"courses":[], "rounds":[]}'></textarea>
+      <div class="row">
+        <button id="btnDoImport" class="btn primary" value="ok">Import</button>
+        <span id="importMsg" class="muted tiny"></span>
+      </div>
+    </form>
+  </dialog>
+
+  <script src="./main.js"></script>
+</body>
+</html>
